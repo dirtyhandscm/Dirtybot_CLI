@@ -1,6 +1,3 @@
-import curses
-import time
-
 beta = [
     " ______ _____ _____ ___  ",
     " | ___ \  ___|_   _/ _ \ ",

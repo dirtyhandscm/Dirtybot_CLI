@@ -1,7 +1,8 @@
+from fileinput import filename
 import json
 import os
 import curses
-import time
+from urllib import response
 import requests
 from dotenv import load_dotenv
 
@@ -159,6 +160,7 @@ def file_selection(stdscr, string, ending=None, downloads=None):
         )
         stdscr.refresh()
         stdscr.getch()
+        # print(e)
 
 
 def cancel_pending_transactions(stdscr):
@@ -190,7 +192,7 @@ def cancel_pending_transactions(stdscr):
         return
 
 
-# Done but not tested
+# tested and working
 def wallet_create(stdscr):
     prompt = Prompt(stdscr)
     curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
@@ -201,7 +203,7 @@ def wallet_create(stdscr):
     # Initialize curses
     curses.curs_set(1)
 
-    num_wallets = prompt.get_str("Enter number of wallets to create:")
+    num_wallets = int(prompt.get_str("Enter number of wallets to create:"))
     file_name = prompt.get_str(
         "Enter file name and '_wallets' will be appended: ex. 20"
     )
@@ -225,7 +227,7 @@ def wallet_create(stdscr):
     # Prep the headers for the api call
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {dirty_api_key}",
+        "X_api_key": f"{dirty_api_key}",
     }
 
     # Make the POST request to the API
@@ -251,7 +253,7 @@ def wallet_create(stdscr):
             stdscr.addstr(
                 5,
                 0,
-                f"Error: {e} \n \n Press any key to continue",
+                f"Error: {e} \n \n Press any key to continue...",
                 RED_BLACK,
             )
             stdscr.getch()
@@ -260,7 +262,7 @@ def wallet_create(stdscr):
         stdscr.addstr(
             5,
             0,
-            f"{num_wallets} wallets generated\n \n Press any key to continue",
+            f"{num_wallets} wallets generated\n \n Press any key to continue...",
             GREEN_BLACK,
         )
         stdscr.getch()
@@ -268,7 +270,7 @@ def wallet_create(stdscr):
         stdscr.addstr(
             5,
             0,
-            f"Error: {response.status_code} \n \n Press any key to continue",
+            f"Error: {response.status_code} \n \n Press any key to continue...",
             RED_BLACK,
         )
         stdscr.getch()
@@ -283,11 +285,138 @@ def disperse(stdscr):
 
 
 def collect_eth(stdscr):
-    pass
+    curses.curs_set(1)
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    RED_BLACK = curses.color_pair(1)
+    GREEN_BLACK = curses.color_pair(2)
+
+    filename = "main.json"
+
+    with open(filename) as f:
+        data = json.load(f)
+
+    # Get fields from loaded data
+    main_address = data["main_address"]
+    main_private_key = data["main_private_key"]
+    node_api_key = data["node_api_key"]
+    network = data["network"]
+    dirty_api_key = data["dirty_api_key"]
+
+    # Load the wallets to collect from
+    try:
+        wallets = file_selection(
+            stdscr, "Select the wallet file to collect from:", "_wallets"
+        )
+        with open(wallets) as f:
+            wallet_data = json.load(f)
+            wallets = wallet_data["wallets"]
+    except Exception as e:
+        stdscr.clear()
+        stdscr.addstr(
+            0,
+            0,
+            f"Error: {e}. Please make sure you have a wallet file in the current directory\n Press any key to continue...",
+            RED_BLACK,
+        )
+        stdscr.refresh()
+        stdscr.getch()
+        return
+
+    senders = [x["address"] for x in wallets]
+    private_keys = [x["private_key"] for x in wallets]
+    count = len(senders)
+
+    # Prep payload for api call
+    payload = {
+        "main_address": main_address,
+        "senders": senders,
+        "private_keys": private_keys,
+        "node_api_key": node_api_key,
+        "network": network}
+
+    # Prep headers for api call
+    headers = {
+        "Content-Type": "application/json",
+        "X_api_key": f"{dirty_api_key}",}
+    
+    # Make the POST request to the API
+    response = requests.post(f"{api_base_url}/api/eth/collect", json=payload, headers=headers)
+
+    if response.status_code == 200:
+        stdscr.clear()
+        stdscr.addstr(
+            0,
+            0,
+            f"Successfully collected from {count} wallets\n \n Press any key to continue...",
+            GREEN_BLACK,
+        )
+        stdscr.refresh()
+        stdscr.getch()
+        
 
 
+# tested and working
 def check_balance(stdscr):
-    pass
+    prompt = Prompt(stdscr)
+    curses.curs_set(0)
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    RED_BLACK = curses.color_pair(1)
+    GREEN_BLACK = curses.color_pair(2)
+
+    bulk_wallets = file_selection(
+        stdscr, "Select the wallet file to check the balance of:", "_wallets"
+    )
+    try:
+        with open(bulk_wallets, "r") as f:
+            check_addresses = json.load(f)["wallets"]
+            check_addresses = [x["address"] for x in check_addresses]
+    except Exception as e:
+        stdscr.clear()
+        stdscr.addstr(
+            0, 0, f"Error: {e}. Press any key to continue...", curses.color_pair(1)
+        )
+        stdscr.refresh()
+        stdscr.getch()
+        return
+    stdscr.clear()
+
+    stdscr.addstr(0, 0, f"Checking balance of {check_addresses} wallets...")
+    stdscr.refresh()
+
+    # Prep the data to be sent to the api
+    wallet_addresses = ",".join(check_addresses)
+    api_url = f"{api_base_url}/api/wallet/balance/{wallet_addresses}?api_key={etherscan_api_key}"
+
+    #  Prep the headers for the api call
+    headers = {"X_api_key": f"{dirty_api_key}"}
+
+    # Make the GET request to the API with url and headers
+    response = requests.get(api_url, headers=headers)
+
+    if response.status_code == 200:
+        balances = response.json()["balances"]
+        stdscr.clear()
+        stdscr.addstr(0, 0, f"Balances of wallets:")
+        stdscr.addstr(1, 0, f"===================")
+        for idx, (address, balance) in enumerate(balances.items(), start=2):
+            stdscr.addstr(idx, 0, f"{address}: {balance}")
+    else:
+        stdscr.clear()
+        stdscr.addstr(
+            0,
+            0,
+            f"Error: {response.status_code} \n \n Press any key to continue",
+            RED_BLACK,
+        )
+        stdscr.getch()
+        return
+
+    # stdscr.addstr(0, 0, f"{api_url}")
+    stdscr.refresh()
+    stdscr.getch()
+    return
 
 
 def bulk_mint(stdscr):
