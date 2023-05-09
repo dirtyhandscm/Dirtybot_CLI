@@ -11,7 +11,7 @@ Dirtybot CLI is a command-line interface tool that provides an interactive menu 
 
 ## Usage
 
-To run the Dirtybot CLI, simply execute the main script:
+To run the CLI application, simply execute the main script and reachout for API key for testing:
 
 ```bash
 python main.py
