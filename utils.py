@@ -2,7 +2,6 @@ from fileinput import filename
 import json
 import os
 import curses
-from urllib import response
 import requests
 from dotenv import load_dotenv
 
@@ -85,7 +84,7 @@ try:
 except IOError as e:
     print(e)
 
-
+# Done
 def file_selection(stdscr, string, ending=None, downloads=None):
     # Initialize curses
     curses.curs_set(0)
@@ -162,7 +161,7 @@ def file_selection(stdscr, string, ending=None, downloads=None):
         stdscr.getch()
         # print(e)
 
-
+# work in progress
 def cancel_pending_transactions(stdscr):
     pass
     tx_hashes = []
@@ -276,14 +275,93 @@ def wallet_create(stdscr):
         stdscr.getch()
 
 
-def imp_tx(stdscr):
-    pass
-
-
+# Done not tested though
 def disperse(stdscr):
-    pass
+    curses.curs_set(1)
+    curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    RED_BLACK = curses.color_pair(1)
+    GREEN_BLACK = curses.color_pair(2)
+    prompt = Prompt(stdscr)
+
+    try:
+        bulk_wallets = file_selection(
+            stdscr, "Select the wallet file to disperse from:", "_wallets"
+        )
+        with open(bulk_wallets) as f:
+            bulk_wallet_data = json.load(f)["wallets"]
+    except Exception as e:
+        stdscr.clear()
+        stdscr.addstr(
+            0,
+            0,
+            f"Error: {e}. Please make sure you have a wallet file in the current directory\n Press any key to continue...",
+            RED_BLACK,
+        )
+        stdscr.refresh()
+        stdscr.getch()
+        return
+    
+    try:
+        recipient_addresses = [r["address"] for r in bulk_wallet_data]
+        add_count = len(recipient_addresses)
+
+        # Get the amount to send
+        eth_per_address = prompt.get_str(
+            f"Enter the amount of ETH to disperse to each address: "
+        )
+
+        payload = {
+            "main_address": main_address,
+            "main_private_keys": main_private_key,
+            "recipients": recipient_addresses,
+            "amount_per": eth_per_address,
+            "network": network,
+            "node_api_key": node_api_key,
+        }
+        # Prep headers for api call
+        headers = {
+            "Content-Type": "application/json",
+            "X_api_key": f"{dirty_api_key}",
+        }
+
+        #Make the POST request to the API
+        response = requests.post(f"{api_base_url}/api/wallet/disperse", json=payload, headers=headers)
+
+        if response.status_code == 200:
+            stdscr.clear()
+            stdscr.addstr(
+                0,
+                0,
+                f"Successfully send eth to {add_count} addresses. \n \n Press any key to continue...",
+                GREEN_BLACK,
+            )
+            stdscr.refresh()
+            stdscr.getch()
+        else:
+            stdscr.clear()
+            stdscr.addstr(
+                0,
+                0,
+                f"Error: {response.status_code} \n \n Press any key to continue",
+                RED_BLACK,
+            )
+            stdscr.getch()
+            return
+    except Exception as e:
+        stdscr.clear()
+        stdscr.addstr(
+                0,0,
+                f"Error: {e}. Press any key to continue...", RED_BLACK
+                )
+    stdscr.refresh()
+    stdscr.getch()
+    return
 
 
+
+
+# tested and working
 def collect_eth(stdscr):
     curses.curs_set(1)
     curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
@@ -322,16 +400,18 @@ def collect_eth(stdscr):
         stdscr.refresh()
         stdscr.getch()
         return
-
-    senders = [x["address"] for x in wallets]
-    private_keys = [x["private_key"] for x in wallets]
+    # Problem is parsing the data on the API side receiving the data as a string instead of a list
+    # senders = [x["address"] for x in wallets]
+    # private_keys = [x["private_key"] for x in wallets]
+    senders = [{"sender": x["address"]} for x in wallets]
+    private_keys = [{"sender_key": x["private_key"]} for x in wallets]
     count = len(senders)
 
     # Prep payload for api call
     payload = {
         "main_address": main_address,
         "senders": senders,
-        "private_keys": private_keys,
+        "senders_keys": private_keys,
         "node_api_key": node_api_key,
         "network": network}
 
@@ -341,7 +421,7 @@ def collect_eth(stdscr):
         "X_api_key": f"{dirty_api_key}",}
     
     # Make the POST request to the API
-    response = requests.post(f"{api_base_url}/api/eth/collect", json=payload, headers=headers)
+    response = requests.post(f"{api_base_url}/api/wallet/collect", json=payload, headers=headers)
 
     if response.status_code == 200:
         stdscr.clear()
@@ -425,6 +505,11 @@ def bulk_mint(stdscr):
 
 def walk_mint(stdscr):
     pass
+
+
+def imp_tx(stdscr):
+    pass
+
 
 
 # You are great and i love you long time. Thank you for all you do.

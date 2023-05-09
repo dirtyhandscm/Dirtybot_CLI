@@ -56,7 +56,7 @@ def submenu1(stdscr):
             current_row_idx += 1
         elif key == curses.KEY_ENTER or key in [10, 13]:
             if options[current_row_idx] == "Setup Main Wallet":
-                bot_setup()
+                bot_setup(stdscr)
                 stdscr.clear()
                 stdscr.refresh()
                 stdscr.addstr(
